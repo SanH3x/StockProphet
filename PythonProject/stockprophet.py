@@ -5,6 +5,7 @@ from prophet import Prophet
 from prophet.plot import plot_plotly, plot_components_plotly
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+import openpyxl
 import os
 
 st.set_page_config(page_title="Análise de Ações com Prophet", layout="wide")
