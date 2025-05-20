@@ -4,12 +4,10 @@ import pandas as pd
 import openpyxl
 from prophet import Prophet
 from prophet.plot import plot_plotly, plot_components_plotly
-import plotly.io as pio
+import plotly.graph_objs as go
 import numpy as np
 from tkhtmlview import HTMLLabel
 import tempfile
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class ProphetStockGUI:
@@ -27,33 +25,27 @@ class ProphetStockGUI:
         self.create_widgets()
 
     def create_widgets(self):
-        # Frame externo para centralizar o conteúdo
         container_frame = ttk.Frame(self.root)
         container_frame.pack(expand=True, fill=tk.BOTH)
 
-        # Frame central com controle
         control_frame = ttk.Frame(container_frame, padding="10")
         control_frame.grid(row=0, column=0, sticky="nsew")
 
-        # Configurar expansão para centralização
         container_frame.grid_rowconfigure(0, weight=1)
         container_frame.grid_columnconfigure(0, weight=1)
         control_frame.grid_columnconfigure(0, weight=1)
         control_frame.grid_columnconfigure(1, weight=1)
         control_frame.grid_columnconfigure(2, weight=1)
 
-        # Linha 0 - Campo de entrada de arquivo
         ttk.Label(control_frame, text="Arquivo de dados:").grid(row=0, column=0, sticky=tk.E, padx=5, pady=5)
         ttk.Entry(control_frame, textvariable=self.file_path, width=50).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         ttk.Button(control_frame, text="Procurar", command=self.load_file).grid(row=0, column=2, padx=5, pady=5)
 
-        # Linha 1 - Seleção de ticker
         ttk.Label(control_frame, text="Selecione o Ticker:").grid(row=1, column=0, sticky=tk.E, padx=5, pady=10)
         self.ticker_combobox = ttk.Combobox(control_frame, textvariable=self.ticker_var, state="readonly")
         self.ticker_combobox.grid(row=1, column=1, padx=5, pady=10, sticky="ew")
         ttk.Button(control_frame, text="Gerar Análise", command=self.generate_analysis).grid(row=1, column=2, padx=5, pady=10)
 
-        # Notebook com abas
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -166,38 +158,25 @@ class ProphetStockGUI:
 
         df_ticker = self.calculate_technical_indicators(df_ticker)
 
-        plt.style.use('seaborn-v0_8' if 'seaborn-v0_8' in plt.style.available else 'ggplot')
-        fig = plt.figure(figsize=(16, 10), facecolor='white')
-        gs = fig.add_gridspec(3, 1, height_ratios=[2, 1, 1])
+        fig = go.Figure()
 
-        ax1 = fig.add_subplot(gs[0])
-        ax1.plot(df_ticker['ds'], df_ticker['y'], label='Preço de Fechamento')
-        ax1.plot(df_ticker['ds'], df_ticker['MA_20'], label='MA 20')
-        ax1.plot(df_ticker['ds'], df_ticker['MA_50'], label='MA 50')
-        ax1.plot(df_ticker['ds'], df_ticker['MA_200'], label='MA 200')
-        ax1.fill_between(df_ticker['ds'], df_ticker['BB_Upper'], df_ticker['BB_Lower'], alpha=0.1)
-        ax1.legend()
-        ax1.grid(True)
+        fig.add_trace(go.Scatter(x=df_ticker['ds'], y=df_ticker['y'], mode='lines', name='Preço de Fechamento'))
+        fig.add_trace(go.Scatter(x=df_ticker['ds'], y=df_ticker['MA_20'], mode='lines', name='MA 20'))
+        fig.add_trace(go.Scatter(x=df_ticker['ds'], y=df_ticker['MA_50'], mode='lines', name='MA 50'))
+        fig.add_trace(go.Scatter(x=df_ticker['ds'], y=df_ticker['MA_200'], mode='lines', name='MA 200'))
+        fig.add_trace(go.Scatter(x=df_ticker['ds'], y=df_ticker['BB_Upper'], mode='lines', name='Bollinger Sup.', line=dict(dash='dot')))
+        fig.add_trace(go.Scatter(x=df_ticker['ds'], y=df_ticker['BB_Lower'], mode='lines', name='Bollinger Inf.', line=dict(dash='dot')))
 
-        ax2 = fig.add_subplot(gs[1], sharex=ax1)
-        ax2.bar(df_ticker['ds'], df_ticker['MACD_Hist'], color=np.where(df_ticker['MACD_Hist'] > 0, 'g', 'r'), alpha=0.3)
-        ax2.plot(df_ticker['ds'], df_ticker['MACD'], label='MACD')
-        ax2.plot(df_ticker['ds'], df_ticker['MACD_Signal'], label='Sinal')
-        ax2.axhline(0, color='black', linewidth=0.5)
-        ax2.legend()
-        ax2.grid(True)
+        fig.update_layout(title=f"Indicadores Técnicos - {ticker}",
+                          xaxis_title='Data',
+                          yaxis_title='Preço (R$)',
+                          template="plotly_white")
 
-        ax3 = fig.add_subplot(gs[2], sharex=ax1)
-        ax3.plot(df_ticker['ds'], df_ticker['y'], label='Preço')
-        ax3.plot(df_ticker['ds'], df_ticker['BB_MA20'], label='MA20')
-        ax3.fill_between(df_ticker['ds'], df_ticker['BB_Upper'], df_ticker['BB_Lower'], alpha=0.2)
-        ax3.legend()
-        ax3.grid(True)
-
-        plt.tight_layout()
-        canvas = FigureCanvasTkAgg(fig, master=self.tab_indicators)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as tmpfile:
+            fig.write_html(tmpfile.name)
+            html_widget = HTMLLabel(self.tab_indicators, html=open(tmpfile.name, 'r', encoding='utf-8').read())
+            html_widget.pack(fill=tk.BOTH, expand=True)
+            self.temp_indicators_path = tmpfile.name
 
     def calculate_technical_indicators(self, df):
         df = df.copy()
