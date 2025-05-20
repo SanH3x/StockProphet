@@ -92,7 +92,7 @@ if uploaded_file is not None:
 
                 # Personalização das cores
                 fig.update_traces(
-                    selector=dict(name='y'),  # Pontos históricos (dados reais)
+                    selector=dict(name='ds'),  # Pontos históricos (dados reais)
                     marker=dict(
                         color='#ffffff',      # Cor dos pontos reais
                         size=4,               # Tamanho dos pontos
