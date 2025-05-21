@@ -15,14 +15,14 @@ st.title("Análise de Ações com Prophet")
 # Dicionário de cores customizadas
 cores = {
     "pontos_reais": "#8d0808",
-    "linha_ma20": "#ff7f0e",
+    "linha_ma20": "#e2710e",
     "linha_ma50": "#1f77b4",
     "linha_ma200": "#2ca02c",
     "macd": "#1f77b4",
     "macd_sinal": "#ff9900",
     "macd_hist_acima": "green",
     "macd_hist_abaixo": "red",
-    "bb_ma20": "#ff7f0e",
+    "bb_ma20": "#ff7700",
     "bb_superior": "#888888",
     "bb_inferior": "#888888",
     "preco": "#0000ff"
