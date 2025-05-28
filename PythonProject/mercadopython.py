@@ -42,11 +42,33 @@ def create_interactive_plots(df, forecast):
     # Gráfico de previsão
     fig_forecast = go.Figure()
     fig_forecast.add_trace(go.Scatter(x=df['ds'], y=df['y'], name='Histórico', line=dict(color='#1f77b4')))
-    fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], name='Previsão', line=dict(color='#2ca02c')))
+    fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], name='Previsão', line=dict(color="#136413")))
     fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], fill=None, mode='lines', line=dict(width=0), showlegend=False))
     fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], fill='tonexty', mode='lines', line=dict(width=0), name='Intervalo de Confiança'))
 
-    fig_forecast.update_layout(title='Previsão de Preço de Fechamento', xaxis_title='Data', yaxis_title='Preço (R$)', hovermode='x unified')
+    fig_forecast.update_layout(
+        title='Previsão de Preço de Fechamento', xaxis_title='Data', yaxis_title='Preço (R$)', hovermode='x unified',
+        plot_bgcolor='white',
+    paper_bgcolor='white',
+    xaxis=dict(
+        showgrid=True,
+        gridcolor='#e0e0e0',
+        zeroline=False,
+        color='black'
+    ),
+    yaxis=dict(
+        showgrid=True,
+        gridcolor='#e0e0e0',
+        zeroline=False,
+        color='black'
+    ),
+    yaxis=dict(
+        showgrid=True,
+        gridcolor='#e0e0e0',
+        zeroline=False,
+        color='black'
+    )
+        )
 
     # Gráfico de componentes
     fig_components = go.Figure()
