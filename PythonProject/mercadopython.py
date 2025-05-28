@@ -7,8 +7,6 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import openpyxl
 import os
-import joblib
-import pickle
 
 # Configurações gerais
 st.set_page_config(page_title="Análise de Ações com Prophet", layout="wide")
@@ -56,18 +54,8 @@ try:
         df_full = pd.read_csv(file_path)
     elif filename.endswith(".xlsx"):
         df_full = pd.read_excel(file_path)
-    elif filename.endswith(".pkl"):
-        with open(file_path, 'rb') as f:
-            df_full = pickle.load(f)
-    elif filename.endswith(".joblib"):
-        df_full = joblib.load(file_path)
     else:
-        st.error("Formato de arquivo não suportado. Use CSV, Excel, PKL ou Joblib.")
-        st.stop()
-
-    # Verifica se o objeto carregado é um DataFrame
-    if not isinstance(df_full, pd.DataFrame):
-        st.error("O arquivo carregado não contém um DataFrame válido.")
+        st.error("Formato de arquivo não suportado.")
         st.stop()
 
     df_full = df_full.rename(columns=lambda x: x.lower())
@@ -90,7 +78,7 @@ try:
 
         with tab1:
             st.subheader(f"Previsão de Preço - {selected_ticker}")
-            model = Prophet(daily_seasonality=True)
+            model = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=True)
             model.fit(df_prophet)
             future = model.make_future_dataframe(periods=180)
             forecast = model.predict(future)
@@ -117,6 +105,10 @@ try:
         with tab2:
             st.subheader(f"Componentes da Previsão - {selected_ticker}")
             fig_components = plot_components_plotly(model, forecast)
+            # Remove o gráfico diário se existir
+            for trace in fig_components['data']:
+                if 'daily' in trace['name'].lower():
+                    trace['visible'] = 'legendonly'  # Isso oculta o gráfico, mas mantém na legenda
             fig_components.update_layout(
                 title=f"Componentes da Previsão ({selected_ticker})",
                 template="plotly_white"
