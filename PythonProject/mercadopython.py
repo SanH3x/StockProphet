@@ -1,177 +1,88 @@
+import streamlit as st
 import pandas as pd
 from prophet import Prophet
-import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output, callback
-import dash_bootstrap_components as dbc
-from datetime import datetime, timedelta
+import plotly.graph_objs as go
+from prophet.plot import plot_plotly
+from sklearn.metrics import r2_score
+from prophet.diagnostics import cross_validation, performance_metrics
+from prophet.plot import plot_plotly
 
-# 1. Carregar e preparar os dados
-def load_and_prepare_data(filepath):
-    if filepath.endswith('.csv'):
-        df = pd.read_csv(filepath)
-    elif filepath.endswith('.xlsx'):
-        df = pd.read_excel(filepath)
-    else:
-        raise ValueError("Formato de arquivo não suportado. Use .csv ou .xlsx")
 
-    if 'ref.date' not in df.columns or 'price.close' not in df.columns:
-        raise ValueError("Colunas obrigatórias 'ref.date' e 'price.close' não encontradas no arquivo")
+st.set_page_config(layout="wide", page_title="Análide de Ações na B3", initial_sidebar_state="expanded")
 
-    df['ref.date'] = pd.to_datetime(df['ref.date'], errors='coerce')
-    df = df.rename(columns={'ref.date': 'ds', 'price.close': 'y'})
-    df = df[['ds', 'y']].dropna()
-
+@st.cache_data
+def carregar_dados():
+    df = pd.read_excel(r"C:\Users\heito\OneDrive\Desktop\datestock.xlsx")
+    df = df.rename(columns=lambda x: str(x).lower())
+    df['ref.date'] = pd.to_datetime(df['ref.date'])
+    df['setor'] = df['setor'].replace(False, 'sem setor')
+    df['subsetor'] = df['subsetor'].replace(False, 'sem subsetor')
+    price_cols = ['price.open', 'price.high', 'price.low', 'price.close', 'price.adjusted']
+    return_cols = ['ret.adjusted.prices', 'ret.closing.prices']
+    for col in price_cols + return_cols:
+        df[col] = df[col].astype(str).str.replace(',', '.').astype(float)
     return df
 
-# 2. Modelagem com Prophet
-def create_prophet_model(df, periods=365, changepoint_prior_scale=0.05):
-    model = Prophet(
-        daily_seasonality=True,
-        weekly_seasonality=True,
-        yearly_seasonality=True,
-        changepoint_prior_scale=changepoint_prior_scale
-    )
-    model.add_country_holidays(country_name='BR')
-    model.fit(df)
-    future = model.make_future_dataframe(periods=periods)
-    forecast = model.predict(future)
-    return model, forecast
+df = carregar_dados()
 
-# 3. Criar gráficos interativos
-def create_interactive_plots(df, forecast):
-    # Gráfico de previsão
-    fig_forecast = go.Figure()
-    fig_forecast.add_trace(go.Scatter(x=df['ds'], y=df['y'], name='Histórico', line=dict(color='#1f77b4')))
-    fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], name='Previsão', line=dict(color="#136413")))
-    fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], fill=None, mode='lines', line=dict(width=0), showlegend=False))
-    fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], fill='tonexty', mode='lines', line=dict(width=0), name='Intervalo de Confiança'))
+# Sidebar
+st.sidebar.title("📈 Análise de Ações com Prophet")
+ticker = st.sidebar.selectbox("Selecione o Ticker", df['ticker'].dropna().unique())
 
-    fig_forecast.update_layout(
-        title='Previsão de Preço de Fechamento', xaxis_title='Data', yaxis_title='Preço (R$)', hovermode='x unified',
-        plot_bgcolor='white',
-    paper_bgcolor='white',
-    xaxis=dict(
-        showgrid=True,
-        gridcolor='#e0e0e0',
-        zeroline=False,
-        color='black'
-    ),
-    yaxis=dict(
-        showgrid=True,
-        gridcolor='#e0e0e0',
-        zeroline=False,
-        color='black'
-    ),
-    yaxis=dict(
-        showgrid=True,
-        gridcolor='#e0e0e0',
-        zeroline=False,
-        color='black'
-    )
-        )
+# Filtragem
+df_ticker = df[df['ticker'] == ticker][['ref.date', 'price.close']].rename(columns={'ref.date': 'ds', 'price.close': 'y'})
+df_ticker.dropna(inplace=True)
 
-    # Gráfico de componentes
-    fig_components = go.Figure()
-    fig_components.add_trace(go.Scatter(x=forecast['ds'], y=forecast['trend'], name='Tendência', line=dict(color='#d62728')))
-    fig_components.add_trace(go.Scatter(x=forecast['ds'], y=forecast['weekly'], name='Sazonalidade Semanal', line=dict(color='#9467bd')))
-    fig_components.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yearly'], name='Sazonalidade Anual', line=dict(color='#ff7f0e')))
-    fig_components.add_trace(go.Scatter(x=forecast['ds'], y=forecast['daily'], name='Sazonalidade Diária', line=dict(color='#17becf')))
+# Modelagem
+modelo = Prophet(daily_seasonality=True)
+modelo.fit(df_ticker)
+futuro = modelo.make_future_dataframe(periods=365)
+previsao = modelo.predict(futuro)
 
-    fig_components.update_layout(title='Componentes da Previsão', xaxis_title='Data', hovermode='x unified')
+# Gráfico interativo
+st.markdown(f"## 📊 Previsão de Preço para {ticker}")
+fig1 = plot_plotly(modelo, previsao)
 
-    return fig_forecast, fig_components
+# Renomear os eixos
+fig1.update_layout(
+    xaxis_title="Data",
+    yaxis_title="Preço Previsto (R$)",
+    title=f"Previsão de Preço da Ação - {ticker}",
+    template="plotly_dark"  # Garante o dark mode
+)
 
-# 4. Criar aplicação Dash
-def create_dash_app(df):
-    app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+st.plotly_chart(fig1, use_container_width=True)
 
-    app.layout = dbc.Container([
-        dbc.Row([
-            dbc.Col([
-                html.Label("Digite o Ticker da Ação:"),
-                dcc.Input(id='ticker-input', type='text', value='', debounce=True, className="form-control")
-            ], width=6)
-        ], className="mb-4"),
+# Componentes
+st.markdown("## 🔍 Componentes da Previsão")
+componentes = modelo.plot_components(previsao)
+st.pyplot(componentes.figure)
 
-        dbc.Row(dbc.Col(html.H1(id='titulo-analise', className="text-center my-4"))),
 
-        dbc.Row([
-            dbc.Col([
-                html.Label("Período de Previsão (dias):"),
-                dcc.Slider(
-                    id='period-slider', min=30, max=730, step=30, value=365,
-                    marks={i: str(i) for i in range(30, 731, 90)}
-                )
-            ], width=6),
-            dbc.Col([
-                html.Label("Sensibilidade a Mudanças:"),
-                dcc.Slider(
-                    id='changepoint-slider', min=0.01, max=0.5, step=0.01, value=0.05,
-                    marks={0.01: '0.01', 0.1: '0.1', 0.2: '0.2', 0.3: '0.3', 0.4: '0.4', 0.5: '0.5'}
-                )
-            ], width=6)
-        ], className="mb-4"),
+# Métricas
+st.markdown("## 📐 Métricas de Avaliação")
+df_cv = cross_validation(modelo, initial='365 days', period='180 days', horizon='90 days')
+df_p = performance_metrics(df_cv)
+r2 = r2_score(df_cv['y'], df_cv['yhat'])
 
-        dbc.Row(dbc.Col(dcc.Graph(id='forecast-graph'))),
-        dbc.Row(dbc.Col(dcc.Graph(id='components-graph'))),
+# HTML personalizado
+html_metricas = f"""
+<div style="background-color:#1c1c1c; padding:20px; border-radius:10px;">
+  <h4 style="color:#00CED1;">Métricas de Avaliação do Modelo</h4>
+  <ul style="color:white; font-size:16px;">
+    <li><strong>RMSE:</strong> {df_p['rmse'].mean():.2f}</li>
+    <li><strong>MAE:</strong> {df_p['mae'].mean():.2f}</li>
+    <li><strong>MAPE:</strong> {df_p['mape'].mean() * 100:.2f}%</li>
+    <li><strong>Coverage:</strong> {df_p['coverage'].mean() * 100:.2f}%</li>
+    <li><strong>R²:</strong> {r2:.4f}</li>
+  </ul>
+</div>
+"""
 
-        dbc.Row([
-            dbc.Col(html.Div(id='metrics-output', className="mt-4 p-3 bg-light rounded")),
-            dbc.Col(dcc.Markdown(id='ticker-description', className="mt-4 p-3 bg-light rounded"))
-        ])
-    ], fluid=True)
+st.markdown(html_metricas, unsafe_allow_html=True)
 
-    @callback(
-        Output('titulo-analise', 'children'),
-        Input('ticker-input', 'value')
-    )
-    def update_titulo(ticker):
-        return f"Análise de Previsão de Ações - {ticker.upper()}"
 
-    @callback(
-        [Output('forecast-graph', 'figure'),
-         Output('components-graph', 'figure'),
-         Output('metrics-output', 'children'),
-         Output('ticker-description', 'children')],
-        [Input('period-slider', 'value'),
-         Input('changepoint-slider', 'value'),
-         Input('ticker-input', 'value')]
-    )
-    def update_forecast(periods, changepoint_prior_scale, ticker):
-        model, forecast = create_prophet_model(df, periods, changepoint_prior_scale)
-        fig_forecast, fig_components = create_interactive_plots(df, forecast)
+# Download
+st.download_button("📥 Baixar Previsão (Excel)", data=previsao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_csv(index=False),
+                   file_name=f'previsao_{ticker}.csv', mime='text/csv')
 
-        last_date = df['ds'].max()
-        forecast_start = last_date + timedelta(days=1)
-        forecast_end = forecast_start + timedelta(days=periods-1)
-
-        metrics = [
-            html.H5(f"Previsão para {ticker.upper()}:"),
-            html.P(f"Período: {forecast_start.strftime('%d/%m/%Y')} a {forecast_end.strftime('%d/%m/%Y')}"),
-            html.P(f"Preço atual: R$ {df['y'].iloc[-1]:.2f}"),
-            html.P(f"Preço previsto: R$ {forecast['yhat'].iloc[-1]:.2f}"),
-            html.P(f"Variação: {((forecast['yhat'].iloc[-1] - df['y'].iloc[-1]) / df['y'].iloc[-1]) * 100:.2f}%")
-        ]
-
-        descricao = f"""
-        ### Sobre o Modelo
-        Esta aplicação utiliza o Facebook Prophet para prever os preços futuros das ações de {ticker.upper()}.
-
-        - **Período de Previsão**: Define a quantidade de dias futuros incluídos na previsão.
-        - **Sensibilidade a Mudanças**: Controla quão rapidamente o modelo reage a alterações nas tendências de preço.
-
-        Os intervalos sombreados representam a incerteza da previsão com 80% de confiança.
-        """
-
-        return fig_forecast, fig_components, metrics, descricao
-
-    return app
-
-# 5. Função principal
-def main():
-    df = load_and_prepare_data(r"C:\Users\heito\PycharmProjects\PythonProject\datestock.xlsx")  # ou .xlsx conforme o caso
-    app = create_dash_app(df)
-    app.run(debug=True)
-
-if __name__ == '__main__':
-    main()
