@@ -6,6 +6,7 @@ from prophet.plot import plot_plotly
 from sklearn.metrics import r2_score
 from prophet.diagnostics import cross_validation, performance_metrics
 from prophet.plot import plot_plotly
+from datetime import timedelta
 
 
 st.set_page_config(layout="wide", page_title="Análide de Ações na B3", initial_sidebar_state="expanded")
@@ -28,6 +29,7 @@ df = carregar_dados()
 # Sidebar
 st.sidebar.title("📈 Análise de Ações com Prophet")
 ticker = st.sidebar.selectbox("Selecione o Ticker", df['ticker'].dropna().unique())
+st.sidebar.markdown('> _\"Utilize esses resultados para auxiliar nas suas decisões, não como certeza.\"_')
 
 # Filtragem
 df_ticker = df[df['ticker'] == ticker][['ref.date', 'price.close']].rename(columns={'ref.date': 'ds', 'price.close': 'y'})
@@ -56,6 +58,7 @@ st.plotly_chart(fig1, use_container_width=True)
 # Componentes
 st.markdown("## 🔍 Componentes da Previsão")
 componentes = modelo.plot_components(previsao)
+componentes.figure.set_size_inches(14, 8)
 st.pyplot(componentes.figure)
 
 
@@ -81,6 +84,33 @@ html_metricas = f"""
 
 st.markdown(html_metricas, unsafe_allow_html=True)
 
+# Datas-alvo baseadas na última data real
+data_base = df_ticker['ds'].max()
+datas_alvo = {
+    '1 Semana': data_base + timedelta(days=7),
+    '1 Mês': data_base + timedelta(days=30),
+    '6 Meses': data_base + timedelta(days=180),
+    '1 Ano': data_base + timedelta(days=365)
+}
+
+# Encontrar os preços previstos mais próximos das datas
+precos_previstos = {}
+for periodo, data_alvo in datas_alvo.items():
+    linha = previsao.iloc[(previsao['ds'] - data_alvo).abs().argsort()[:1]]
+    precos_previstos[periodo] = linha['yhat'].values[0]
+
+# HTML estilizado para sidebar
+html_sidebar = """
+<div style="background-color:#262730; padding:15px; border-radius:10px;">
+  <h4 style="color:#00CED1;">📊 Preços Previstos</h4>
+  <ul style="color:white; font-size:15px; padding-left:20px;">
+"""
+for periodo, preco in precos_previstos.items():
+    html_sidebar += f"<li><b>{periodo}:</b> R$ {preco:.2f}</li>"
+html_sidebar += "</ul></div>"
+
+# Exibir na sidebar
+st.sidebar.markdown(html_sidebar, unsafe_allow_html=True)
 
 # Download
 st.download_button("📥 Baixar Previsão (Excel)", data=previsao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_csv(index=False),
