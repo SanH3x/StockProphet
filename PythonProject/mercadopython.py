@@ -25,7 +25,7 @@ st.markdown("""
 @st.cache_data
 
 def carregar_dados():
-    df = pd.read_excel(r"C:\Users\heito\OneDrive\Desktop\datestock.xlsx")
+    df = pd.read_excel(r"C:\Users\heito\PycharmProjects\PythonProject\datestock.xlsx")
     df = df.rename(columns=lambda x: str(x).lower())
     df['ref.date'] = pd.to_datetime(df['ref.date'])
     df['setor'] = df['setor'].replace(False, 'sem setor')
@@ -110,7 +110,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 fig_comp = modelo.plot_components(previsao)
-fig_comp.set_size_inches(14, 8)
+fig_comp.set_size_inches(12, 10)
 st.pyplot(fig_comp.figure)
 
 # Métricas
