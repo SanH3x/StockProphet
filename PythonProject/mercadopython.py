@@ -66,14 +66,24 @@ df_plot = pd.merge(previsao[['ds', 'yhat', 'yhat_upper', 'yhat_lower']],
 
 # Gráfico de Previsão com controle de cores e barra deslizante
 fig_custom = go.Figure()
-fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['Preço Real'],
-    mode='lines', name='Preço Real', line=dict(color='white', width=2)))
+fig_custom.add_trace(go.Scatter(
+    x=df_plot['ds'], y=df_plot['Preço Real'],
+    mode='markers',  # agora em pontos
+    name='Preço Real',
+    marker=dict(color="#2490F5", size=4, symbol='circle')
+))
 fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['yhat'],
-    mode='lines', name='Previsão Central', line=dict(color='deepskyblue', width=3)))
-fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['yhat_upper'],
-    mode='lines', name='Limite Superior', line=dict(color='lightgreen', dash='dot')))
-fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['yhat_lower'],
-    mode='lines', name='Limite Inferior', line=dict(color='orangered', dash='dot')))
+    mode='lines', name='Previsão do Modelo', line=dict(color="#F45A4F", width=3)))
+# Área entre yhat_upper e yhat_lower
+fig_custom.add_trace(go.Scatter(
+    x=pd.concat([df_plot['ds'], df_plot['ds'][::-1]]),
+    y=pd.concat([df_plot['yhat_upper'], df_plot['yhat_lower'][::-1]]),
+    fill='toself',
+    fillcolor='rgba(90,160,156,0.2)',
+    line=dict(color='rgba(90,160,156,0.25)'), # Cor entorno da área do intevalo
+    hoverinfo="skip",
+    name='Intervalo de Confiança'
+))
 
 fig_custom.update_layout(
     title=f"📈 Previsão de Preço da Ação - {ticker}",
