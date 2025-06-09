@@ -5,6 +5,7 @@ from prophet.plot import plot_plotly
 from prophet.diagnostics import cross_validation, performance_metrics
 from sklearn.metrics import r2_score
 from datetime import timedelta
+import plotly.graph_objects as go
 
 
 # Configuração da página
@@ -20,10 +21,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-
 # Carregamento e preprocessamento dos dados
 @st.cache_data
-
 def carregar_dados():
     df = pd.read_excel(r"C:\Users\heito\PycharmProjects\PythonProject\datestock.xlsx")
     df = df.rename(columns=lambda x: str(x).lower())
@@ -46,6 +45,7 @@ ticker = st.sidebar.selectbox("Selecione o Ticker", df['ticker'].dropna().unique
 df_ticker = df[df['ticker'] == ticker][['ref.date', 'price.close']].rename(columns={'ref.date': 'ds', 'price.close': 'y'})
 df_ticker.dropna(inplace=True)
 
+
 # Modelo Prophet
 modelo = Prophet(daily_seasonality=True)
 modelo.fit(df_ticker)
@@ -59,47 +59,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Criar figura com plot_plotly
 fig1 = plot_plotly(modelo, previsao)
-
-# Personalizar legendas e cores
-fig1.update_traces(
-    selector=dict(name="yhat"),
-    name="Previsão Central",
-    line=dict(color="#00CED1", width=3)
-)
-fig1.update_traces(
-    selector=dict(name="yhat_upper"),
-    name="Limite Superior",
-    line=dict(color="#98FB98", dash="dot")
-)
-fig1.update_traces(
-    selector=dict(name="yhat_lower"),
-    name="Limite Inferior",
-    line=dict(color="#FF6F61", dash="dot")
-)
-fig1.update_traces(
-    selector=dict(name="actual"),
-    name="Preço Real",
-    line=dict(color="#FFFFFF", width=2)
-)
-
-# Layout e tema escuro
-fig1.update_layout(
-    xaxis_title="Data",
-    yaxis_title="Preço (R$)",
-    title=f"Previsão de Preço da Ação - {ticker}",
-    template="plotly_dark",
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="center",
-        x=0.5
-    )
-)
-
-# Exibir
+fig1.update_traces(selector=dict(name="yhat"), name="Previsão Central", line=dict(color="deepskyblue", width=3))
+fig1.update_traces(selector=dict(name="yhat_upper"), name="Limite Superior", line=dict(color="lightgreen", dash="dot"))
+fig1.update_traces(selector=dict(name="yhat_lower"), name="Limite Inferior", line=dict(color="orangered", dash="dot"))
+fig1.update_traces(selector=dict(name="actual"), name="Preço Real", line=dict(color="white", width=2))
+fig1.update_layout(xaxis_title="Data", yaxis_title="Preço (R$)", title=f"Previsão de Preço da Ação - {ticker}", template="plotly_dark",
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5))
 st.plotly_chart(fig1, use_container_width=True)
 
 
@@ -112,6 +78,59 @@ st.markdown("""
 fig_comp = modelo.plot_components(previsao)
 fig_comp.set_size_inches(12, 10)
 st.pyplot(fig_comp.figure)
+
+
+# Indicadores técnicos
+st.markdown("""
+<div style="margin-top:30px;margin-bottom:10px;">
+  <h2 style="color:#00CED1;">📉 Médias Móveis, Bandas de Bollinger e MACD</h2>
+</div>
+""", unsafe_allow_html=True)
+
+df_ti = df[df['ticker'] == ticker][['ref.date', 'price.close']].copy()
+df_ti = df_ti.rename(columns={'ref.date': 'Date', 'price.close': 'Close'})
+df_ti['MA20'] = df_ti['Close'].rolling(window=20).mean()
+df_ti['MA50'] = df_ti['Close'].rolling(window=50).mean()
+df_ti['UpperBB'] = df_ti['MA20'] + 2 * df_ti['Close'].rolling(window=20).std()
+df_ti['LowerBB'] = df_ti['MA20'] - 2 * df_ti['Close'].rolling(window=20).std()
+exp1 = df_ti['Close'].ewm(span=12, adjust=False).mean()
+exp2 = df_ti['Close'].ewm(span=26, adjust=False).mean()
+df_ti['MACD'] = exp1 - exp2
+df_ti['Signal'] = df_ti['MACD'].ewm(span=9, adjust=False).mean()
+
+fig_ma_bb = go.Figure()
+fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['Close'], mode='lines', name='Preço Fechamento', line=dict(color='blue')))
+fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['MA20'], mode='lines', name='Média Móvel 20', line=dict(color='cyan')))
+fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['MA50'], mode='lines', name='Média Móvel 50', line=dict(color='magenta')))
+fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['UpperBB'], mode='lines', name='Banda Superior', line=dict(color='green', dash='dot')))
+fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['LowerBB'], mode='lines', name='Banda Inferior', line=dict(color='tomato', dash='dot')))
+fig_ma_bb.update_layout(title='Médias Móveis e Bandas de Bollinger', xaxis_title='Data', yaxis_title='Preço (R$)', template='plotly_dark')
+st.plotly_chart(fig_ma_bb, use_container_width=True)
+
+fig_macd = go.Figure()
+fig_macd.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['MACD'], mode='lines', name='MACD', line=dict(color='orange')))
+fig_macd.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['Signal'], mode='lines', name='Sinal', line=dict(color='aqua')))
+# Cálculo do histograma
+histograma = df_ti['MACD'] - df_ti['Signal']
+positivo = histograma.where(histograma >= 0)
+negativo = histograma.where(histograma < 0)
+
+# Barras positivas em verde
+fig_macd.add_trace(go.Bar(
+    x=df_ti['Date'], y=positivo,
+    name='MACD +',
+    marker_color='limegreen'
+))
+
+# Barras negativas em vermelho
+fig_macd.add_trace(go.Bar(
+    x=df_ti['Date'], y=negativo,
+    name='MACD -',
+    marker_color='red'
+))
+fig_macd.update_layout(title='MACD - Moving Average Convergence Divergence', xaxis_title='Data', yaxis_title='MACD', template='plotly_dark')
+st.plotly_chart(fig_macd, use_container_width=True)
+
 
 # Métricas
 st.markdown("""
