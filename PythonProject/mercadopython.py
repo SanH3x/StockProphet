@@ -219,17 +219,6 @@ for periodo, preco in precos_previstos.items():
 html_sidebar += "</ul></div>"
 st.sidebar.markdown(html_sidebar, unsafe_allow_html=True)
 
-# Legenda da previsão na sidebar
-st.sidebar.markdown("""
-<div style="background-color:#262730; padding:15px; border-radius:10px; margin-top:15px;">
-  <h4 style="color:#00CED1;">📘 Legenda - Previsão do Preço</h4>
-  <ul style="color:white; font-size:14px;">
-    <li><b style="color:#FFFFFF;">Preço Real:</b> pontos pretos</li>
-    <li><b style="color:#00CED1;">Previsão dos preços:</b> linha azul</li>
-    <li><b style="color:#98FB98;">Limite Superior e Inferior:</b> área opaca azul</li>
-  </ul>
-</div>
-""", unsafe_allow_html=True)
 
 # Aviso
 st.sidebar.markdown("""
