@@ -59,14 +59,44 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-fig1 = plot_plotly(modelo, previsao)
-fig1.update_traces(selector=dict(name="yhat"), name="Previsão Central", line=dict(color="deepskyblue", width=3))
-fig1.update_traces(selector=dict(name="yhat_upper"), name="Limite Superior", line=dict(color="lightgreen", dash="dot"))
-fig1.update_traces(selector=dict(name="yhat_lower"), name="Limite Inferior", line=dict(color="orangered", dash="dot"))
-fig1.update_traces(selector=dict(name="actual"), name="Preço Real", line=dict(color="white", width=2))
-fig1.update_layout(xaxis_title="Data", yaxis_title="Preço (R$)", title=f"Previsão de Preço da Ação - {ticker}", template="plotly_dark",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5))
-st.plotly_chart(fig1, use_container_width=True)
+# Merge para gráfico
+df_plot = pd.merge(previsao[['ds', 'yhat', 'yhat_upper', 'yhat_lower']],
+                   df_ticker.rename(columns={'ds': 'ds', 'y': 'Preço Real'}),
+                   on='ds', how='left')
+
+# Gráfico de Previsão com controle de cores e barra deslizante
+fig_custom = go.Figure()
+fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['Preço Real'],
+    mode='lines', name='Preço Real', line=dict(color='white', width=2)))
+fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['yhat'],
+    mode='lines', name='Previsão Central', line=dict(color='deepskyblue', width=3)))
+fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['yhat_upper'],
+    mode='lines', name='Limite Superior', line=dict(color='lightgreen', dash='dot')))
+fig_custom.add_trace(go.Scatter(x=df_plot['ds'], y=df_plot['yhat_lower'],
+    mode='lines', name='Limite Inferior', line=dict(color='orangered', dash='dot')))
+
+fig_custom.update_layout(
+    title=f"📈 Previsão de Preço da Ação - {ticker}",
+    xaxis_title="Data",
+    yaxis_title="Preço (R$)",
+    template="plotly_dark",
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+    xaxis=dict(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1d", step="day", stepmode="backward"),
+                dict(count=7, label="1w", step="day", stepmode="backward"),
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        ),
+        rangeslider=dict(visible=True),
+        type="date"
+    )
+)
+
+st.plotly_chart(fig_custom, use_container_width=True)
 
 
 # Componentes da previsão
@@ -99,7 +129,7 @@ df_ti['MACD'] = exp1 - exp2
 df_ti['Signal'] = df_ti['MACD'].ewm(span=9, adjust=False).mean()
 
 fig_ma_bb = go.Figure()
-fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['Close'], mode='lines', name='Preço Fechamento', line=dict(color='blue')))
+fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['Close'], mode='lines', name='Preço Fechamento', line=dict(color='#F0E68C')))
 fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['MA20'], mode='lines', name='Média Móvel 20', line=dict(color='cyan')))
 fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['MA50'], mode='lines', name='Média Móvel 50', line=dict(color='magenta')))
 fig_ma_bb.add_trace(go.Scatter(x=df_ti['Date'], y=df_ti['UpperBB'], mode='lines', name='Banda Superior', line=dict(color='green', dash='dot')))
